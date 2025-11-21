@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import Logo from "./Logo";
-import backgroundImage from "../assets/Background.jpg";
+import backgroundImage from "../assets/Background.jpeg";
 
 export const Login = ({ onLogin, onShowToast }) => {
   const [username, setUsername] = useState("");
@@ -404,7 +404,7 @@ export const Login = ({ onLogin, onShowToast }) => {
               {/* Footer */}
               <div className="mt-6 pt-6 border-t border-white/10 text-center">
                 <p className="text-xs text-white/60 mb-1">
-                  © 2025 SMPN 2 Cililin
+                  © 2025 SMPN 2 CILILIN
                 </p>
                 <p className="text-xs text-white/40">
                   Sistem Administrasi Sekolah • v1.0.0
