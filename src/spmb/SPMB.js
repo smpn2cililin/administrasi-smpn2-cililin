@@ -490,7 +490,7 @@ const SPMB = ({ user, onShowToast }) => {
         <div className="bg-gradient-to-br from-blue-900 via-blue-700 to-blue-600 rounded-xl p-8 sm:p-10 shadow-lg">
           <div className="text-center space-y-2">
             <h2 className="text-2xl sm:text-lg text-blue-200 font-semibold uppercase tracking-widest">
-              Sekolah Menengah Pertama Muslimin Cililin
+              Sekolah Menengah Pertama Negeri 2 Cililin
             </h2>
             <h1 className="text-2xl sm:text-3xl font-bold text-white">
               Sistem Penerimaan Murid Baru (SPMB)
