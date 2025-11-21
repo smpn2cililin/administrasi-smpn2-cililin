@@ -48,19 +48,19 @@ const HomeroomReportModal = ({
     if (headers && headers.length > 0) {
       return headers;
     }
-    
+
     // Auto-generate from first data row
     if (dataToUse.length > 0) {
       const firstRow = dataToUse[0];
-      return Object.keys(firstRow).map(key => {
+      return Object.keys(firstRow).map((key) => {
         // Convert snake_case to Title Case
         return key
-          .split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
+          .split("_")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
       });
     }
-    
+
     return [];
   }, [headers, dataToUse]);
 
@@ -280,7 +280,7 @@ const HomeroomReportModal = ({
                   "bg-indigo-50 border-indigo-100",
                 ];
                 const colorClass = pastelColors[idx % pastelColors.length];
-                
+
                 return (
                   <div
                     key={idx}
@@ -355,15 +355,19 @@ const HomeroomReportModal = ({
 
                         // If header is generated (Title Case), find matching snake_case key
                         if (value === undefined || value === null) {
-                          const snakeCase = header.toLowerCase().replace(/\s+/g, '_');
+                          const snakeCase = header
+                            .toLowerCase()
+                            .replace(/\s+/g, "_");
                           value = row[snakeCase];
                         }
 
                         // Try direct key match from original data
                         if (value === undefined || value === null) {
-                          const matchingKey = originalKeys.find(k => 
-                            k.toLowerCase() === header.toLowerCase() ||
-                            k.toLowerCase().replace(/_/g, ' ') === header.toLowerCase()
+                          const matchingKey = originalKeys.find(
+                            (k) =>
+                              k.toLowerCase() === header.toLowerCase() ||
+                              k.toLowerCase().replace(/_/g, " ") ===
+                                header.toLowerCase()
                           );
                           if (matchingKey) {
                             value = row[matchingKey];
@@ -374,7 +378,11 @@ const HomeroomReportModal = ({
                           // Try common alternatives - EXPANDED MAPPING
                           const keyMap = {
                             NIS: ["nis", "student_nis"],
-                            "Nama Lengkap": ["full_name", "name", "student_name"],
+                            "Nama Lengkap": [
+                              "full_name",
+                              "name",
+                              "student_name",
+                            ],
                             "Nama Siswa": ["full_name", "name", "student_name"],
                             "Jenis Kelamin": ["gender"],
                             Kelas: ["class_id", "class"],
@@ -394,8 +402,16 @@ const HomeroomReportModal = ({
                             Alpa: ["alpa", "absent", "tidak_hadir"],
                             Absen: ["tidak_hadir", "absent"],
                             Total: ["total", "total_days"],
-                            Persentase: ["persentase", "percentage", "tingkat_kehadiran"],
-                            "Tingkat Kehadiran": ["tingkat_kehadiran", "persentase", "percentage"],
+                            Persentase: [
+                              "persentase",
+                              "percentage",
+                              "tingkat_kehadiran",
+                            ],
+                            "Tingkat Kehadiran": [
+                              "tingkat_kehadiran",
+                              "persentase",
+                              "percentage",
+                            ],
                           };
 
                           const alternatives = keyMap[header] || [];
@@ -445,9 +461,11 @@ const HomeroomReportModal = ({
             {totalPages > 1 ? (
               <div className="flex items-center gap-4">
                 <div className="text-sm text-slate-600 whitespace-nowrap">
-                  Menampilkan {startIndex + 1} - {Math.min(endIndex, filteredData.length)} dari {filteredData.length} data
+                  Menampilkan {startIndex + 1} -{" "}
+                  {Math.min(endIndex, filteredData.length)} dari{" "}
+                  {filteredData.length} data
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
