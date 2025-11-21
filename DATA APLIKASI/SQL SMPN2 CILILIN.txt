@@ -1,0 +1,349 @@
+-- =====================================================
+-- SCHEMA DATABASE APLIKASI ADMINISTRASI SMPN 2 CILILIN
+-- =====================================================
+-- Jalankan script ini di Supabase SQL Editor
+-- Urutan sudah disesuaikan dengan dependency foreign key
+
+-- Enable UUID extension (jika belum ada)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- =====================================================
+-- 1. TABEL INDEPENDENT (Tidak ada foreign key)
+-- =====================================================
+
+-- Tabel Tahun Akademik
+CREATE TABLE public.academic_years (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  year character varying NOT NULL,
+  semester integer NOT NULL CHECK (semester = ANY (ARRAY[1, 2])),
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  is_active boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT academic_years_pkey PRIMARY KEY (id)
+);
+
+-- Tabel Pengumuman
+CREATE TABLE public.announcement (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title character varying NOT NULL,
+  content text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT announcement_pkey PRIMARY KEY (id)
+);
+
+-- Tabel Kelas
+CREATE TABLE public.classes (
+  id character varying NOT NULL,
+  grade integer NOT NULL CHECK (grade = ANY (ARRAY[7, 8, 9])),
+  academic_year character varying NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  is_active boolean DEFAULT true,
+  CONSTRAINT classes_pkey PRIMARY KEY (id)
+);
+
+-- Tabel Pengaturan Sekolah
+CREATE TABLE public.school_settings (
+  id serial NOT NULL,
+  setting_key character varying NOT NULL UNIQUE,
+  setting_value text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT school_settings_pkey PRIMARY KEY (id)
+);
+
+-- Tabel Pengaturan SPMB
+CREATE TABLE public.spmb_settings (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  target_academic_year character varying NOT NULL,
+  is_active boolean DEFAULT true,
+  registration_start_date date,
+  registration_end_date date,
+  created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT spmb_settings_pkey PRIMARY KEY (id)
+);
+
+-- Tabel Siswa Baru (PPDB/SPMB)
+CREATE TABLE public.siswa_baru (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  no_pendaftaran character varying NOT NULL UNIQUE,
+  nama_lengkap character varying NOT NULL,
+  nisn character varying UNIQUE,
+  jenis_kelamin character varying NOT NULL,
+  tempat_lahir character varying NOT NULL,
+  tanggal_lahir date NOT NULL,
+  asal_sekolah character varying NOT NULL,
+  nama_ayah character varying,
+  pekerjaan_ayah character varying,
+  pendidikan_ayah character varying,
+  nama_ibu character varying,
+  pekerjaan_ibu character varying,
+  pendidikan_ibu character varying,
+  no_hp character varying NOT NULL,
+  alamat text NOT NULL,
+  academic_year character varying NOT NULL,
+  status character varying DEFAULT 'diterima'::character varying,
+  is_transferred boolean DEFAULT false,
+  tanggal_daftar timestamp without time zone DEFAULT now(),
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  transferred_at timestamp without time zone,
+  transferred_by uuid,
+  kelas character varying CHECK (kelas IS NULL OR kelas::text ~ '^[789][A-F]$'::text),
+  nis character varying,
+  CONSTRAINT siswa_baru_pkey PRIMARY KEY (id)
+);
+
+-- Tabel History Cleanup
+CREATE TABLE public.cleanup_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  timestamp timestamp with time zone DEFAULT now(),
+  triggered_by text NOT NULL,
+  results jsonb NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT cleanup_history_pkey PRIMARY KEY (id)
+);
+
+-- =====================================================
+-- 2. TABEL USERS (Referensi untuk banyak tabel lain)
+-- =====================================================
+
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  username character varying NOT NULL UNIQUE,
+  password character varying,
+  full_name character varying NOT NULL,
+  teacher_id character varying UNIQUE,
+  role character varying NOT NULL CHECK (role::text = ANY (ARRAY['admin'::character varying, 'teacher'::character varying, 'guru_bk'::character varying]::text[])),
+  homeroom_class_id character varying,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  no_hp character varying,
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_users_homeroom_class FOREIGN KEY (homeroom_class_id) REFERENCES public.classes(id)
+);
+
+-- =====================================================
+-- 3. TABEL STUDENTS (Referensi untuk tabel lain)
+-- =====================================================
+
+CREATE TABLE public.students (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  full_name character varying NOT NULL,
+  nis character varying NOT NULL UNIQUE,
+  gender character varying CHECK (gender::text = ANY (ARRAY['L'::character varying, 'P'::character varying, 'Laki-laki'::character varying, 'Perempuan'::character varying]::text[])),
+  class_id character varying NOT NULL,
+  academic_year character varying NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT students_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_students_class FOREIGN KEY (class_id) REFERENCES public.classes(id)
+);
+
+-- =====================================================
+-- 4. TABEL DENGAN FOREIGN KEY KE USERS & STUDENTS
+-- =====================================================
+
+-- Tabel Kehadiran
+CREATE TABLE public.attendances (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  teacher_id uuid NOT NULL,
+  date date NOT NULL,
+  subject character varying NOT NULL,
+  status character varying NOT NULL CHECK (status::text = ANY (ARRAY['present'::character varying, 'absent'::character varying, 'late'::character varying, 'sick'::character varying, 'permit'::character varying, 'Hadir'::character varying, 'Sakit'::character varying, 'Izin'::character varying, 'Tidak Hadir'::character varying, 'Terlambat'::character varying, 'Alpa'::character varying]::text[])),
+  created_at timestamp with time zone DEFAULT now(),
+  notes text,
+  class_id character varying NOT NULL,
+  type character varying DEFAULT 'regular'::character varying CHECK (type::text = ANY (ARRAY['regular'::character varying, 'exam'::character varying, 'event'::character varying, 'mapel'::character varying, 'harian'::character varying]::text[])),
+  CONSTRAINT attendances_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_attendances_student FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT fk_attendances_class FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT fk_attendances_teacher FOREIGN KEY (teacher_id) REFERENCES public.users(id)
+);
+
+-- Tabel Nilai
+CREATE TABLE public.grades (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  class_id character varying NOT NULL,
+  teacher_id uuid NOT NULL,
+  subject character varying NOT NULL,
+  assignment_type character varying NOT NULL,
+  score numeric CHECK (score >= 0::numeric AND score <= 100::numeric),
+  semester integer CHECK (semester = ANY (ARRAY[1, 2])),
+  academic_year character varying NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT grades_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_grades_student FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT fk_grades_class FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT fk_grades_teacher FOREIGN KEY (teacher_id) REFERENCES public.users(id)
+);
+
+-- Tabel Konseling
+CREATE TABLE public.konseling (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid,
+  nis text,
+  full_name text,
+  gender text,
+  class_id text,
+  tanggal timestamp with time zone DEFAULT now(),
+  jenis_layanan text,
+  bidang_bimbingan text,
+  permasalahan text,
+  kronologi text,
+  tindakan_layanan text,
+  hasil_layanan text,
+  rencana_tindak_lanjut text,
+  status_layanan text DEFAULT 'Dalam Proses'::text,
+  guru_bk_id uuid,
+  guru_bk_name text,
+  academic_year text,
+  semester text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  tingkat_urgensi character varying DEFAULT 'Sedang'::character varying CHECK (tingkat_urgensi::text = ANY (ARRAY['Rendah'::character varying, 'Sedang'::character varying, 'Tinggi'::character varying, 'Darurat'::character varying]::text[])),
+  kategori_masalah character varying CHECK (kategori_masalah::text = ANY (ARRAY['Akademik'::character varying, 'Perilaku'::character varying, 'Sosial-Emosional'::character varying, 'Pertemanan'::character varying, 'Keluarga'::character varying, 'Percintaan'::character varying, 'Teknologi/Gadget'::character varying, 'Kenakalan'::character varying, 'Kesehatan Mental'::character varying, 'Lainnya'::character varying]::text[])),
+  perlu_followup boolean DEFAULT false,
+  tanggal_followup date,
+  CONSTRAINT konseling_pkey PRIMARY KEY (id),
+  CONSTRAINT konseling_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT konseling_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT konseling_guru_bk_id_fkey FOREIGN KEY (guru_bk_id) REFERENCES public.users(id)
+);
+
+-- Tabel Catatan Perkembangan Siswa
+CREATE TABLE public.student_development_notes (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  student_id uuid NOT NULL,
+  teacher_id uuid NOT NULL,
+  class_id character varying NOT NULL,
+  academic_year text NOT NULL,
+  semester text NOT NULL,
+  category text NOT NULL CHECK (category = ANY (ARRAY['Akademik'::text, 'Perilaku'::text, 'Sosial'::text, 'Karakter'::text, 'Kesehatan'::text])),
+  label text NOT NULL CHECK (label = ANY (ARRAY['positif'::text, 'perhatian'::text, 'netral'::text])),
+  note_content text NOT NULL,
+  action_taken text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT student_development_notes_pkey PRIMARY KEY (id),
+  CONSTRAINT student_development_notes_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT student_development_notes_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.users(id),
+  CONSTRAINT student_development_notes_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id)
+);
+
+-- Tabel Jadwal Guru
+CREATE TABLE public.teacher_schedules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  teacher_id uuid NOT NULL,
+  day character varying NOT NULL,
+  start_time time without time zone NOT NULL,
+  end_time time without time zone NOT NULL,
+  class_id character varying NOT NULL,
+  room_number character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT teacher_schedules_pkey PRIMARY KEY (id),
+  CONSTRAINT teacher_schedules_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.users(id),
+  CONSTRAINT teacher_schedules_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id)
+);
+
+-- Tabel Penugasan Guru
+CREATE TABLE public.teacher_assignments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  teacher_id character varying NOT NULL,
+  class_id character varying,
+  subject character varying NOT NULL,
+  academic_year character varying NOT NULL,
+  semester integer CHECK (semester = ANY (ARRAY[1, 2])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT teacher_assignments_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_teacher_assignments_class FOREIGN KEY (class_id) REFERENCES public.classes(id)
+);
+
+-- Tabel Log Kesehatan Sistem
+CREATE TABLE public.system_health_logs (
+  id bigserial NOT NULL,
+  checked_at timestamp with time zone NOT NULL DEFAULT now(),
+  checked_by uuid,
+  total_issues integer NOT NULL DEFAULT 0,
+  critical_count integer NOT NULL DEFAULT 0,
+  warning_count integer NOT NULL DEFAULT 0,
+  info_count integer NOT NULL DEFAULT 0,
+  issues_detail jsonb,
+  execution_time integer,
+  status text NOT NULL CHECK (status = ANY (ARRAY['healthy'::text, 'warning'::text, 'critical'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_health_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT system_health_logs_checked_by_fkey FOREIGN KEY (checked_by) REFERENCES public.users(id)
+);
+
+-- =====================================================
+-- 5. INDEXES UNTUK PERFORMA (OPSIONAL TAPI RECOMMENDED)
+-- =====================================================
+
+CREATE INDEX idx_students_class_id ON public.students(class_id);
+CREATE INDEX idx_students_nis ON public.students(nis);
+CREATE INDEX idx_attendances_student_id ON public.attendances(student_id);
+CREATE INDEX idx_attendances_date ON public.attendances(date);
+CREATE INDEX idx_attendances_class_id ON public.attendances(class_id);
+CREATE INDEX idx_grades_student_id ON public.grades(student_id);
+CREATE INDEX idx_grades_class_id ON public.grades(class_id);
+CREATE INDEX idx_konseling_student_id ON public.konseling(student_id);
+CREATE INDEX idx_konseling_guru_bk_id ON public.konseling(guru_bk_id);
+CREATE INDEX idx_users_role ON public.users(role);
+CREATE INDEX idx_teacher_schedules_teacher_id ON public.teacher_schedules(teacher_id);
+
+-- =====================================================
+-- 6. DATA AWAL (OPSIONAL)
+-- =====================================================
+
+-- Insert Tahun Akademik Aktif
+INSERT INTO public.academic_years (year, semester, start_date, end_date, is_active) 
+VALUES ('2024/2025', 2, '2025-01-01', '2025-06-30', true);
+
+INSERT INTO public.classes (id, grade, academic_year, is_active) VALUES
+('7A', 7, '2025/2026', true),
+('7B', 7, '2025/2026', true),
+('7C', 7, '2025/2026', true),
+('7D', 7, '2025/2026', true),
+('7E', 7, '2025/2026', true),
+('7F', 7, '2025/2026', true),
+('8A', 8, '2025/2026', true),
+('8B', 8, '2025/2026', true),
+('8C', 8, '2025/2026', true),
+('8D', 8, '2025/2026', true),
+('8E', 8, '2025/2026', true),
+('8F', 8, '2025/2026', true),
+('9A', 9, '2025/2026', true),
+('9B', 9, '2025/2026', true),
+('9C', 9, '2025/2026', true),
+('9D', 9, '2025/2026', true),
+('9E', 9, '2025/2026', true),
+('9F', 9, '2025/2026', true);
+
+
+-- Insert Admin Default (Password: admin123 - GANTI SETELAH LOGIN!)
+INSERT INTO public.users (username, password, full_name, role, is_active)
+VALUES ('admin', 'admin123', 'Administrator SMPN 2 Cililin', 'admin', true);
+
+-- Insert School Settings Default
+INSERT INTO public.school_settings (setting_key, setting_value) VALUES
+('school_name', 'SMPN 2 Cililin'),
+('school_address', 'Jl. Raya Cililin, Kab. Bandung Barat'),
+('school_phone', '-'),
+('school_email', '-'),
+('school_logo', NULL),
+('kepala_sekolah', '-'),
+('nip_kepala_sekolah', '-');
+
+-- =====================================================
+-- SELESAI! Database siap digunakan.
+-- =====================================================
