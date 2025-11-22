@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
-import { DataExcel } from "./DataExcel"; // ✅ IMPORT DATAEXCEL
+import { DataExcel } from "./DataExcel";
 
 export const Teachers = () => {
   const [guruData, setGuruData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [exportLoading, setExportLoading] = useState(false); // ✅ STATE LOADING EXPORT
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     fetchDataGuru();
@@ -15,11 +15,28 @@ export const Teachers = () => {
     try {
       setIsLoading(true);
 
-      // ✅ UPDATE: Include both teacher AND guru_bk roles
-      const { data: guruData, error: guruError } = await supabase
+      // ✅ UPDATE: Include teacher, guru_bk, AND admin with teacher_id G-01
+      const { data: allUsers, error: guruError } = await supabase
         .from("users")
-        .select("id, teacher_id, full_name, is_active, homeroom_class_id, role")
-        .in("role", ["teacher", "guru_bk"]); // ✅ Include guru_bk
+        .select(
+          "id, teacher_id, full_name, is_active, homeroom_class_id, role"
+        );
+
+      if (guruError) throw guruError;
+
+      // ✅ Filter: Ambil teacher, guru_bk, dan HANYA admin yang punya teacher_id G-01
+      const guruData = allUsers.filter((user) => {
+        // Ambil semua teacher dan guru_bk
+        if (user.role === "teacher" || user.role === "guru_bk") {
+          return true;
+        }
+        // Untuk admin, hanya yang teacher_id = G-01 (Kepala Sekolah)
+        if (user.role === "admin" && user.teacher_id === "G-01") {
+          return true;
+        }
+        // Exclude admin lainnya
+        return false;
+      });
 
       if (guruError) throw guruError;
 
@@ -43,9 +60,9 @@ export const Teachers = () => {
         // ✅ Tentukan tugas/mapel berdasarkan role dan teacher_id
         let tugasMapel = [];
 
-        if (guru.teacher_id === "G-01") {
-          // Kepala Sekolah
-          tugasMapel = ["Kepala Sekolah"];
+        if (guru.teacher_id === "G-01" || guru.role === "admin") {
+          // ✅ Kepala Sekolah (bisa dari teacher_id G-01 atau role admin)
+          tugasMapel = ["KEPALA SEKOLAH"];
         } else if (guru.role === "guru_bk") {
           // GURU BK/BP
           tugasMapel = ["GURU BK/BP"];
@@ -168,7 +185,7 @@ export const Teachers = () => {
                   Nama Guru
                 </th>
                 <th className="w-48 sm:w-72 px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                  Tugas/Mapel {/* ✅ UPDATE: Mata Pelajaran -> Tugas/Mapel */}
+                  Tugas/Mapel
                 </th>
                 <th className="w-28 sm:w-32 px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-white uppercase tracking-wider text-center">
                   Wali Kelas
@@ -262,15 +279,18 @@ export const Teachers = () => {
         )}
       </div>
 
-      {/* Stats Footer (Optional) */}
+      {/* Stats Footer */}
       {guruData.length > 0 && (
         <div className="mt-4 sm:mt-6 bg-white rounded-lg shadow-md shadow-blue-100/50 border border-blue-100 p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs sm:text-sm text-slate-600 space-y-2 sm:space-y-0">
             <span>Total: {guruData.length} guru</span>
-            <span>
-              Aktif: {guruData.filter((g) => g.is_active).length} | Non-aktif:{" "}
-              {guruData.filter((g) => !g.is_active).length}
-            </span>
+            <div className="flex gap-4">
+              <span>Aktif: {guruData.filter((g) => g.is_active).length}</span>
+              <span>|</span>
+              <span>
+                Non-aktif: {guruData.filter((g) => !g.is_active).length}
+              </span>
+            </div>
           </div>
         </div>
       )}
