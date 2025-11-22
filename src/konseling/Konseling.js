@@ -21,6 +21,7 @@ const Konseling = ({ user, onShowToast }) => {
   const [konselingData, setKonselingData] = useState([]);
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [allowedClasses, setAllowedClasses] = useState([]); // ✅ BARU: Kelas yang diizinkan
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -35,19 +36,19 @@ const Konseling = ({ user, onShowToast }) => {
     studentName: "",
   });
 
-  // Filters - ✅ UPDATED: Tambah filter urgensi & kategori
+  // Filters
   const [filters, setFilters] = useState({
     search: "",
     kelas: "",
     status: "",
-    tingkat_urgensi: "", // NEW
-    kategori_masalah: "", // NEW
-    perlu_followup: "", // NEW
+    tingkat_urgensi: "",
+    kategori_masalah: "",
+    perlu_followup: "",
     tanggalAwal: "",
     tanggalAkhir: "",
   });
 
-  // Form data - ✅ UPDATED: Tambah field baru
+  // Form data
   const [formData, setFormData] = useState({
     student_id: "",
     nis: "",
@@ -57,41 +58,87 @@ const Konseling = ({ user, onShowToast }) => {
     tanggal: new Date().toISOString().split("T")[0],
     jenis_layanan: "",
     bidang_bimbingan: "",
-    tingkat_urgensi: "", // NEW - default Sedang
-    kategori_masalah: "", // NEW
+    tingkat_urgensi: "Sedang",
+    kategori_masalah: "",
     permasalahan: "",
     kronologi: "",
     tindakan_layanan: "",
     hasil_layanan: "",
     rencana_tindak_lanjut: "",
-    perlu_followup: false, // NEW
-    tanggal_followup: "", // NEW
+    perlu_followup: false,
+    tanggal_followup: "",
     status_layanan: "Dalam Proses",
   });
 
-  // Stats - ✅ UPDATED: Tambah stats urgensi & follow-up
+  // Stats
   const [stats, setStats] = useState({
     total: 0,
     dalam_proses: 0,
     selesai: 0,
-    darurat: 0, // NEW
-    perlu_followup: 0, // NEW
+    darurat: 0,
+    perlu_followup: 0,
   });
+
+  // ✅ BARU: Load allowed classes berdasarkan teacher_assignments
+  useEffect(() => {
+    loadAllowedClasses();
+  }, [user]);
 
   // Load data
   useEffect(() => {
-    loadKonselingData();
-    loadStudents();
-    loadClasses();
-  }, []);
+    if (allowedClasses.length > 0 || user.role === "admin") {
+      loadKonselingData();
+      loadStudents();
+      loadClasses();
+    }
+  }, [allowedClasses]);
+
+  // ✅ BARU: Function untuk load kelas yang diizinkan
+  const loadAllowedClasses = async () => {
+    try {
+      // Admin bisa akses semua kelas
+      if (user.role === "admin") {
+        setAllowedClasses(["ALL"]);
+        return;
+      }
+
+      // Guru BK: ambil kelas dari teacher_assignments
+      if (user.teacher_id) {
+        const { data, error } = await supabase
+          .from("teacher_assignments")
+          .select("class_id")
+          .eq("teacher_id", user.teacher_id)
+          .eq("academic_year", "2025/2026")
+          .eq("semester", "1");
+
+        if (error) throw error;
+
+        const classIds = [...new Set(data.map((item) => item.class_id))];
+        setAllowedClasses(classIds);
+
+        console.log("Allowed classes for Guru BK:", classIds);
+      }
+    } catch (error) {
+      console.error("Error loading allowed classes:", error);
+      onShowToast("Error memuat data kelas", "error");
+    }
+  };
 
   const loadKonselingData = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+
+      let query = supabase
         .from("konseling")
         .select("*")
         .order("tanggal", { ascending: false });
+
+      // ✅ BARU: Filter berdasarkan kelas yang diizinkan (kecuali admin)
+      if (user.role !== "admin" && allowedClasses.length > 0) {
+        query = query.in("class_id", allowedClasses);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setKonselingData(data || []);
@@ -106,11 +153,18 @@ const Konseling = ({ user, onShowToast }) => {
 
   const loadStudents = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("students")
         .select("id, nis, full_name, gender, class_id")
         .eq("is_active", true)
         .order("full_name");
+
+      // ✅ BARU: Filter siswa berdasarkan kelas yang diizinkan (kecuali admin)
+      if (user.role !== "admin" && allowedClasses.length > 0) {
+        query = query.in("class_id", allowedClasses);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setStudents(data || []);
@@ -121,20 +175,28 @@ const Konseling = ({ user, onShowToast }) => {
 
   const loadClasses = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("classes")
         .select("id, grade")
         .eq("academic_year", "2025/2026")
         .order("id");
 
+      const { data, error } = await query;
+
       if (error) throw error;
-      setClasses(data || []);
+
+      // ✅ BARU: Filter kelas berdasarkan allowed classes (kecuali admin)
+      let filteredClasses = data || [];
+      if (user.role !== "admin" && allowedClasses.length > 0) {
+        filteredClasses = data.filter((cls) => allowedClasses.includes(cls.id));
+      }
+
+      setClasses(filteredClasses);
     } catch (error) {
       console.error("Error loading classes:", error);
     }
   };
 
-  // ✅ UPDATED: Calculate stats dengan urgensi & follow-up
   const calculateStats = (data) => {
     const total = data.length;
     const dalam_proses = data.filter(
@@ -153,12 +215,12 @@ const Konseling = ({ user, onShowToast }) => {
     setStats({ total, dalam_proses, selesai, darurat, perlu_followup });
   };
 
-  // ✅ UPDATED: Filter functions dengan field baru
   const filteredKonseling = konselingData.filter((item) => {
     const matchesSearch =
       !filters.search ||
       item.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
       item.nis?.includes(filters.search);
+    const matchesKelas = !filters.kelas || item.class_id === filters.kelas;
     const matchesStatus =
       !filters.status || item.status_layanan === filters.status;
     const matchesUrgensi =
@@ -180,6 +242,7 @@ const Konseling = ({ user, onShowToast }) => {
 
     return (
       matchesSearch &&
+      matchesKelas &&
       matchesStatus &&
       matchesUrgensi &&
       matchesKategori &&
@@ -206,7 +269,6 @@ const Konseling = ({ user, onShowToast }) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ✅ UPDATED: Modal handlers dengan field baru
   const openAddModal = () => {
     setFormData({
       student_id: "",
@@ -242,7 +304,7 @@ const Konseling = ({ user, onShowToast }) => {
       tanggal: konseling.tanggal.split("T")[0],
       jenis_layanan: konseling.jenis_layanan,
       bidang_bimbingan: konseling.bidang_bimbingan,
-      tingkat_urgensi: konseling.tingkat_urgensi || "",
+      tingkat_urgensi: konseling.tingkat_urgensi || "Sedang",
       kategori_masalah: konseling.kategori_masalah || "",
       permasalahan: konseling.permasalahan,
       kronologi: konseling.kronologi,
@@ -268,7 +330,6 @@ const Konseling = ({ user, onShowToast }) => {
     setFormData((prev) => ({ ...prev, ...updates }));
   };
 
-  // ✅ UPDATED: handleSubmit dengan field baru + validasi
   const handleSubmit = async () => {
     try {
       // Validasi field wajib
@@ -304,7 +365,6 @@ const Konseling = ({ user, onShowToast }) => {
         onShowToast("Kronologi wajib diisi", "error");
         return;
       }
-      // Validasi: Jika perlu follow-up, tanggal follow-up wajib diisi
       if (formData.perlu_followup && !formData.tanggal_followup) {
         onShowToast(
           "Tanggal follow-up wajib diisi jika perlu follow-up",
@@ -315,7 +375,6 @@ const Konseling = ({ user, onShowToast }) => {
 
       setLoading(true);
 
-      // Data yang akan disimpan
       const konselingData = {
         student_id: formData.student_id,
         nis: formData.nis,
@@ -325,15 +384,15 @@ const Konseling = ({ user, onShowToast }) => {
         tanggal: formData.tanggal,
         jenis_layanan: formData.jenis_layanan,
         bidang_bimbingan: formData.bidang_bimbingan,
-        tingkat_urgensi: formData.tingkat_urgensi, // NEW
-        kategori_masalah: formData.kategori_masalah, // NEW
+        tingkat_urgensi: formData.tingkat_urgensi,
+        kategori_masalah: formData.kategori_masalah,
         permasalahan: formData.permasalahan,
         kronologi: formData.kronologi,
         tindakan_layanan: formData.tindakan_layanan || null,
         hasil_layanan: formData.hasil_layanan || null,
         rencana_tindak_lanjut: formData.rencana_tindak_lanjut || null,
-        perlu_followup: formData.perlu_followup, // NEW
-        tanggal_followup: formData.tanggal_followup || null, // NEW
+        perlu_followup: formData.perlu_followup,
+        tanggal_followup: formData.tanggal_followup || null,
         status_layanan: formData.status_layanan,
         guru_bk_id: user.id,
         guru_bk_name: user.full_name,
@@ -378,7 +437,6 @@ const Konseling = ({ user, onShowToast }) => {
     }
   };
 
-  // Delete functions
   const handleDelete = (id, studentName) => {
     setDeleteConfirm({ show: true, id, studentName });
   };
@@ -403,7 +461,6 @@ const Konseling = ({ user, onShowToast }) => {
     }
   };
 
-  // Export PDF
   const handleExportPDF = async (item) => {
     try {
       await exportKonselingPDF(item);
@@ -420,6 +477,11 @@ const Konseling = ({ user, onShowToast }) => {
         <h1 className="text-3xl font-bold text-gray-800">Konseling BK/BP</h1>
         <p className="text-gray-600 mt-2">
           Manajemen data konseling dan bimbingan siswa
+          {user.role !== "admin" && allowedClasses.length > 0 && (
+            <span className="ml-2 text-blue-600 font-medium">
+              ({allowedClasses.length} kelas)
+            </span>
+          )}
         </p>
       </div>
 
@@ -432,6 +494,7 @@ const Konseling = ({ user, onShowToast }) => {
         onFilterChange={handleFilterChange}
         onResetFilters={resetFilters}
         onOpenAddModal={openAddModal}
+        classes={classes}
       />
 
       {/* Table */}

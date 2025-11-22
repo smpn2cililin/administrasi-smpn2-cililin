@@ -209,7 +209,7 @@ const FormView = ({
   );
 };
 
-// Komponen DashboardView yang terpisah - UPDATE untuk admin
+// Komponen DashboardView yang terpisah
 const DashboardView = ({
   currentClass,
   academicYear,
@@ -244,7 +244,6 @@ const DashboardView = ({
             )}
           </p>
         </div>
-        {/* HIDE TOMBOL TAMBAH CATATAN UNTUK ADMIN */}
         {!isAdmin && (
           <button
             onClick={onAddNote}
@@ -281,7 +280,6 @@ const DashboardView = ({
         </div>
       </div>
 
-      {/* Info untuk Admin */}
       {isAdmin && (
         <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
           <div className="flex items-center gap-3">
@@ -420,7 +418,7 @@ const DashboardView = ({
   );
 };
 
-// Komponen DetailView yang terpisah - UPDATE untuk admin
+// Komponen DetailView yang terpisah
 const DetailView = ({
   selectedSiswa,
   catatanList,
@@ -480,7 +478,6 @@ const DetailView = ({
 
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-xl font-bold text-gray-800">Timeline Catatan</h3>
-        {/* HIDE TOMBOL TAMBAH CATATAN UNTUK ADMIN */}
         {!isAdmin && (
           <button
             onClick={onAddNote}
@@ -540,7 +537,6 @@ const DetailView = ({
                     {formatDate(catatan.created_at)}
                   </span>
                 </div>
-                {/* HIDE EDIT/DELETE BUTTONS UNTUK ADMIN */}
                 {!isAdmin && (
                   <div className="flex gap-2">
                     <button
@@ -599,7 +595,7 @@ const DetailView = ({
   );
 };
 
-// Komponen Utama - UPDATE dengan isAdmin logic
+// Komponen Utama
 const CatatanSiswa = ({ user, onShowToast }) => {
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedSiswa, setSelectedSiswa] = useState(null);
@@ -636,7 +632,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
 
   const kategoris = ["Akademik", "Perilaku", "Sosial", "Karakter", "Kesehatan"];
 
-  // TAMBAH: Cek apakah user adalah admin
   const isAdmin =
     currentUser?.role === "admin" || currentUser?.role === "administrator";
 
@@ -697,7 +692,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
 
       console.log("📊 User verified:", dbUser);
 
-      // FIX: Handle admin user yang gak punya homeroom_class_id
       const isAdminUser =
         dbUser.role === "admin" || dbUser.role === "administrator";
 
@@ -712,7 +706,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
 
       setCurrentUser(dbUser);
 
-      // FIX: Untuk admin, biarkan currentClass = null (lihat semua kelas)
       if (isAdminUser && !dbUser.homeroom_class_id) {
         console.log("👨‍💼 Admin user detected - will view all classes");
         setCurrentClass(null);
@@ -743,32 +736,51 @@ const CatatanSiswa = ({ user, onShowToast }) => {
     }
   };
 
-  // LOAD DASHBOARD DATA - FIX semester comparison
+  // 🔥 LOAD DASHBOARD DATA - DENGAN LOG LENGKAP UNTUK DEBUG
   const loadDashboardData = async () => {
     setLoading(true);
     setError(null);
 
     try {
       console.log("📊 Loading dashboard via RPC...");
+      console.log("📊 Current User:", currentUser);
+      console.log("📊 Current Class:", currentClass);
+      console.log("📊 Academic Year:", academicYear);
+      console.log("📊 Semester:", semester);
+      console.log("📊 Is Admin:", isAdmin);
 
       const semesterValue = semester === "Ganjil" ? "1" : "2";
 
-      // Call RPC function
-      const { data, error } = await supabase.rpc("get_student_notes_summary", {
+      // Prepare parameters
+      const rpcParams = {
         p_academic_year: academicYear,
         p_semester: semesterValue,
         p_teacher_id: !isAdmin ? currentUser.id : null,
         p_class_id: !isAdmin ? currentClass : null,
-      });
+      };
+
+      console.log("📤 RPC Parameters:", rpcParams);
+
+      // Call RPC function
+      const { data, error } = await supabase.rpc(
+        "get_student_notes_summary",
+        rpcParams
+      );
 
       if (error) {
         console.error("❌ RPC Error:", error);
+        console.error("❌ Error message:", error.message);
+        console.error("❌ Error details:", error.details);
+        console.error("❌ Error hint:", error.hint);
+        console.error("❌ Error code:", error.code);
         throw error;
       }
 
       console.log(`✅ RPC returned ${data?.length || 0} students`);
+      console.log("📊 Raw data:", data);
 
       if (!data || data.length === 0) {
+        console.log("⚠️ No data returned, setting empty state");
         setSiswaList([]);
         setStats({
           totalSiswa: 0,
@@ -781,18 +793,26 @@ const CatatanSiswa = ({ user, onShowToast }) => {
       }
 
       // Process RPC results
-      const processedStudents = data.map((student) => ({
-        id: student.student_id,
-        nama: student.full_name,
-        nis: student.nis,
-        class_id: student.class_id,
-        positif: parseInt(student.positif_count) || 0,
-        perhatian: parseInt(student.perhatian_count) || 0,
-        netral: parseInt(student.netral_count) || 0,
-        lastUpdate: student.last_note_date
-          ? formatRelativeTime(student.last_note_date)
-          : "Belum ada catatan",
-      }));
+      const processedStudents = data.map((student) => {
+        const positif = parseInt(student.positif_count) || 0;
+        const perhatian = parseInt(student.perhatian_count) || 0;
+        const netral = parseInt(student.netral_count) || 0;
+
+        return {
+          id: student.student_id,
+          nama: student.full_name,
+          nis: student.nis,
+          class_id: student.class_id,
+          positif: positif,
+          perhatian: perhatian,
+          netral: netral,
+          lastUpdate: student.last_note_date
+            ? formatRelativeTime(student.last_note_date)
+            : "Belum ada catatan",
+        };
+      });
+
+      console.log("📊 Processed students:", processedStudents);
 
       setSiswaList(processedStudents);
 
@@ -805,29 +825,35 @@ const CatatanSiswa = ({ user, onShowToast }) => {
       );
       const studentsWithNetral = processedStudents.filter((s) => s.netral > 0);
 
-      setStats({
+      const newStats = {
         totalSiswa: processedStudents.length,
         progressPositif: studentsWithPositif.length,
         perluPerhatian: studentsWithPerhatian.length,
         catatanBiasa: studentsWithNetral.length,
-      });
+      };
+
+      console.log("📈 Stats calculated:", newStats);
+      setStats(newStats);
 
       console.log("✅ Dashboard loaded via RPC! 🚀");
     } catch (err) {
-      setError(err.message);
+      const errorMsg = err.message || "Terjadi kesalahan saat memuat data";
+      setError(errorMsg);
       console.error("💥 Error loading dashboard:", err);
+
+      if (onShowToast) {
+        onShowToast(errorMsg, "error");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Juga UPDATE loadStudentNotes function - cari dan ganti bagian ini:
   const loadStudentNotes = async (studentId) => {
     setLoading(true);
     try {
-      console.log("📝 Loading notes for student:", studentId);
+      console.log("🔍 Loading notes for student:", studentId);
 
-      // FIX: Gunakan semester sebagai text
       const semesterValue = semester === "Ganjil" ? "1" : "2";
 
       let notesQuery = supabase
@@ -835,10 +861,9 @@ const CatatanSiswa = ({ user, onShowToast }) => {
         .select("*")
         .eq("student_id", studentId)
         .eq("academic_year", academicYear)
-        .eq("semester", semesterValue) // FIX: Gunakan text, bukan number
+        .eq("semester", semesterValue)
         .order("created_at", { ascending: false });
 
-      // Hanya teacher yang filter by teacher_id sendiri
       if (!isAdmin && currentUser) {
         notesQuery = notesQuery.eq("teacher_id", currentUser.id);
         console.log("👨‍🏫 Teacher mode: only loading own notes");
@@ -855,7 +880,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
 
       console.log(`✅ Loaded ${data?.length || 0} notes for student`);
 
-      // Add teacher name
       const notesWithTeacher = await Promise.all(
         (data || []).map(async (note) => {
           if (note.teacher_id) {
@@ -883,7 +907,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
     }
   };
 
-  // Juga UPDATE handleCreateNote function - cari dan ganti bagian ini:
   const handleCreateNote = async (e) => {
     e.preventDefault();
 
@@ -906,7 +929,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
     setError(null);
 
     try {
-      // FIX: Gunakan semester sebagai text
       const semesterValue = semester === "Ganjil" ? "1" : "2";
 
       const noteData = {
@@ -914,7 +936,7 @@ const CatatanSiswa = ({ user, onShowToast }) => {
         teacher_id: currentUser.id,
         class_id: currentClass,
         academic_year: academicYear,
-        semester: semesterValue, // FIX: Gunakan text, bukan number
+        semester: semesterValue,
         category: formData.category,
         label: formData.label,
         note_content: formData.note_content,
@@ -956,7 +978,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
     }
   };
 
-  // UPDATE NOTE - ADMIN TIDAK BISA UPDATE
   const handleUpdateNote = async (e) => {
     e.preventDefault();
 
@@ -993,7 +1014,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
 
       console.log("✅ Note updated successfully");
 
-      // FIX: Reload data untuk semua state
       await loadStudentNotes(selectedSiswa.id);
       await loadDashboardData();
 
@@ -1022,7 +1042,6 @@ const CatatanSiswa = ({ user, onShowToast }) => {
     }
   };
 
-  // DELETE NOTE - ADMIN TIDAK BISA DELETE
   const handleDeleteNote = async (noteId) => {
     if (isAdmin) {
       window.alert("Admin tidak dapat menghapus catatan perkembangan siswa.");

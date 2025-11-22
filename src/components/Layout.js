@@ -148,8 +148,25 @@ const Layout = ({ user, onLogout, children }) => {
   const getPageSubtitle = () => {
     if (!user) return "SMPN 2 Cililin";
 
-    const { role, homeroom_class_id } = user;
+    const { role, homeroom_class_id, isGuruBK } = user;
     const currentPage = getCurrentPageName();
+
+    // ✅ BARU: Tambah subtitle khusus Guru BK
+    if (isGuruBK) {
+      const guruBKSubtitles = {
+        Dashboard: "Dashboard Bimbingan Konseling",
+        "Data Siswa": "Lihat Data Siswa Sekolah",
+        "Data Guru": "Lihat Data Guru Sekolah",
+        "Data Kelas": "Lihat Data Kelas Sekolah",
+        Kehadiran: "Lihat Kehadiran Siswa",
+        "Nilai Akademik": "Lihat Nilai Akademik Siswa",
+        "Jadwal Saya": "Lihat Jadwal Mengajar",
+        "Catatan Siswa": "Monitor Perkembangan Siswa",
+        Konseling: "Kelola Data Konseling Siswa",
+        Laporan: "Laporan BK/BP",
+      };
+      return guruBKSubtitles[currentPage] || "Bimbingan Konseling";
+    }
 
     const subtitles = {
       admin: {
@@ -166,14 +183,6 @@ const Layout = ({ user, onLogout, children }) => {
         SPMB: "Seleksi Penerimaan Murid Baru",
         Pengaturan: "Pengaturan Sistem Sekolah",
         "Monitor Sistem": "Pemeriksaan Kesehatan Sistem dan Integritas Data",
-      },
-      guru_bk: {
-        Dashboard: "Dashboard Bimbingan Konseling",
-        "Data Siswa": "Lihat Data Siswa Sekolah",
-        "Data Guru": "Lihat Data Guru Sekolah",
-        "Jadwal Saya": "Lihat Jadwal Mengajar",
-        Laporan: "Laporan BK/BP",
-        Konseling: "Kelola Data Konseling Siswa",
       },
       teacher: homeroom_class_id
         ? {
@@ -269,10 +278,11 @@ const Layout = ({ user, onLogout, children }) => {
 
   const getUserRoleDisplay = () => {
     if (!user) return "User";
-    const { role, homeroom_class_id } = user;
+    const { role, homeroom_class_id, isGuruBK } = user;
 
+    // ✅ BARU: Prioritaskan display Guru BK
+    if (isGuruBK) return "Guru BK/BP";
     if (role === "admin") return "Admin";
-    if (role === "guru_bk") return "Guru BK/BP";
     if (role === "teacher" && homeroom_class_id)
       return `Wali ${homeroom_class_id}`;
     if (role === "teacher") return "Guru";
@@ -290,6 +300,7 @@ const Layout = ({ user, onLogout, children }) => {
         />
       )}
 
+      {/* Desktop Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-50 ${
           isSidebarOpen ? "w-64" : "w-0"
@@ -300,9 +311,11 @@ const Layout = ({ user, onLogout, children }) => {
           isOpen={isSidebarOpen}
           userRole={user?.role}
           isWaliKelas={!!user?.homeroom_class_id}
+          isGuruBK={!!user?.isGuruBK} // ✅ BARU: Pass props isGuruBK
         />
       </div>
 
+      {/* Mobile Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-50 w-64 transform ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -313,6 +326,7 @@ const Layout = ({ user, onLogout, children }) => {
           isOpen={true}
           userRole={user?.role}
           isWaliKelas={!!user?.homeroom_class_id}
+          isGuruBK={!!user?.isGuruBK} // ✅ BARU: Pass props isGuruBK
           onClose={() => setMobileMenuOpen(false)}
         />
       </div>
@@ -417,10 +431,11 @@ const Layout = ({ user, onLogout, children }) => {
                           {user?.full_name || user?.username || "User"}
                         </p>
                         <p className="text-xs text-blue-600 capitalize font-medium">
-                          {user?.role === "admin"
-                            ? "Administrator"
-                            : user?.role === "guru_bk"
+                          {/* ✅ BARU: Update role display dengan prioritas Guru BK */}
+                          {user?.isGuruBK
                             ? "Guru BK/BP"
+                            : user?.role === "admin"
+                            ? "Administrator"
                             : user?.role === "teacher" &&
                               user?.homeroom_class_id
                             ? `Wali Kelas ${user.homeroom_class_id}`
