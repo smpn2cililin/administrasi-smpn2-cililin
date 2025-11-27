@@ -71,7 +71,7 @@ export const Teachers = () => {
       const kepalaSekolah = {
         id: "kepala-sekolah-001",
         teacher_id: "G-01",
-        full_name: "ADE NURMUGHNI",
+        full_name: "Hj. HENI NURIAH, S.Pd.",
         is_active: true,
         homeroom_class_id: null,
         role: "teacher",
