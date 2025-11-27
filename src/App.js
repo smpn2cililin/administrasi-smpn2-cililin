@@ -10,6 +10,7 @@ import Teachers from "./pages/Teachers";
 import Classes from "./pages/Classes";
 import Students from "./pages/Students";
 import Attendance from "./pages/Attendance";
+import AttendanceManagement from "./pages/AttendanceManagement";
 import Grades from "./pages/Grades";
 import TeacherSchedule from "./pages/TeacherSchedule";
 import CatatanSiswa from "./pages/CatatanSiswa";
@@ -25,6 +26,9 @@ import MonitorSistem from "./system/MonitorSistem";
 import MaintenancePage from "./setting/MaintenancePage";
 import AdminPanel from "./setting/AdminPanel";
 
+// ✅ IMPORT BARU: Presensi Guru
+import TeacherAttendance from "./attendance-teacher/TeacherAttendance";
+
 function App() {
   // ========== STATE ==========
   const [user, setUser] = useState(null);
@@ -37,12 +41,13 @@ function App() {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
+  const [whitelistUsers, setWhitelistUsers] = useState([]); // ✅ TAMBAH STATE WHITELIST
 
   // ========== 1. CHECK MAINTENANCE STATUS ==========
   useEffect(() => {
     checkMaintenanceStatus();
 
-    // Subscribe to real-time changes
+    // ✅ Subscribe to real-time changes (TAMBAH maintenance_whitelist)
     const subscription = supabase
       .channel("maintenance-changes")
       .on(
@@ -51,9 +56,11 @@ function App() {
           event: "*",
           schema: "public",
           table: "school_settings",
-          filter: "setting_key=in.(maintenance_mode,maintenance_message)",
+          filter:
+            "setting_key=in.(maintenance_mode,maintenance_message,maintenance_whitelist)", // ✅ TAMBAH whitelist
         },
         (payload) => {
+          console.log("🔔 Maintenance settings changed:", payload);
           loadMaintenanceSettings();
         }
       )
@@ -66,18 +73,23 @@ function App() {
     try {
       await loadMaintenanceSettings();
     } catch (error) {
-      console.error("Error checking maintenance:", error);
+      console.error("❌ Error checking maintenance:", error);
     } finally {
       setMaintenanceLoading(false);
     }
   };
 
+  // ✅ UPDATE: Load whitelist juga
   const loadMaintenanceSettings = async () => {
     try {
       const { data, error } = await supabase
         .from("school_settings")
         .select("setting_key, setting_value")
-        .in("setting_key", ["maintenance_mode", "maintenance_message"]);
+        .in("setting_key", [
+          "maintenance_mode",
+          "maintenance_message",
+          "maintenance_whitelist", // ✅ TAMBAH whitelist
+        ]);
 
       if (error) throw error;
 
@@ -95,8 +107,22 @@ function App() {
         settings.maintenance_message ||
           "Aplikasi sedang dalam maintenance. Kami akan kembali segera!"
       );
+
+      // ✅ Parse whitelist dari database
+      if (settings.maintenance_whitelist) {
+        try {
+          const parsed = JSON.parse(settings.maintenance_whitelist);
+          setWhitelistUsers(Array.isArray(parsed) ? parsed : []);
+          console.log("✅ Whitelist loaded:", parsed);
+        } catch (e) {
+          console.error("❌ Error parsing whitelist:", e);
+          setWhitelistUsers([]);
+        }
+      } else {
+        setWhitelistUsers([]);
+      }
     } catch (error) {
-      console.error("Error loading maintenance settings:", error);
+      console.error("❌ Error loading maintenance settings:", error);
     }
   };
 
@@ -117,7 +143,7 @@ function App() {
         if (userData.expiryTime) {
           const currentTime = Date.now();
           if (currentTime > userData.expiryTime) {
-            console.log("Session expired");
+            console.log("⏰ Session expired");
             localStorage.removeItem("user");
             localStorage.removeItem("rememberMe");
             setUser(null);
@@ -132,7 +158,7 @@ function App() {
 
         setUser(userData);
       } catch (err) {
-        console.error("Error parsing stored user:", err);
+        console.error("❌ Error parsing stored user:", err);
         localStorage.removeItem("user");
         localStorage.removeItem("rememberMe");
         setUser(null);
@@ -186,10 +212,10 @@ function App() {
 
     if (rememberMe) {
       localStorage.setItem("rememberMe", "true");
-      console.log("Remember Me enabled - session valid for 30 days");
+      console.log("✅ Remember Me enabled - session valid for 30 days");
     } else {
       localStorage.setItem("rememberMe", "false");
-      console.log("Session valid for 24 hours");
+      console.log("✅ Session valid for 24 hours");
     }
 
     handleShowToast(`Selamat datang, ${userData.full_name}! 👋`, "success");
@@ -224,9 +250,17 @@ function App() {
     }
   };
 
-  // ========== 6. PROTECTED ROUTE COMPONENT ==========
+  // ✅ HELPER FUNCTION: Cek apakah user ada di whitelist
+  const isUserWhitelisted = useCallback(
+    (userId) => {
+      return whitelistUsers.some((u) => u.id === userId);
+    },
+    [whitelistUsers]
+  );
+
+  // ========== 6. PROTECTED ROUTE COMPONENT (UPDATED) ==========
   const ProtectedRoute = useCallback(
-    ({ children }) => {
+    ({ children, allowedRoles = [] }) => {
       if (loading || maintenanceLoading) {
         return (
           <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -242,14 +276,80 @@ function App() {
         return <Navigate to="/" />;
       }
 
-      // ✅ CEK MAINTENANCE: Jika ON dan user bukan admin, redirect ke maintenance
-      if (isMaintenanceMode && user.role !== "admin") {
+      // ✅ CEK ROLE-BASED ACCESS
+      if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+        console.log(
+          `🔴 User ${user.username} tidak memiliki akses ke halaman ini`
+        );
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg
+                  className="w-8 h-8 text-red-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-9a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                Akses Ditolak
+              </h2>
+              <p className="text-gray-600 mb-4">
+                Anda tidak memiliki izin untuk mengakses halaman ini.
+              </p>
+              <button
+                onClick={() => (window.location.href = "/dashboard")}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                Kembali ke Dashboard
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // ✅ CEK MAINTENANCE dengan WHITELIST
+      // User bisa akses jika:
+      // 1. Bukan maintenance mode, ATAU
+      // 2. User adalah admin, ATAU
+      // 3. User ada di whitelist
+      const canAccess =
+        !isMaintenanceMode ||
+        user.role === "admin" ||
+        isUserWhitelisted(user.id);
+
+      if (!canAccess) {
+        console.log(`🔴 User ${user.username} blocked by maintenance mode`);
         return <MaintenancePage message={maintenanceMessage} />;
+      }
+
+      // ✅ Debug log untuk user yang bisa akses saat maintenance
+      if (isMaintenanceMode && canAccess) {
+        if (user.role === "admin") {
+          console.log(`✅ Admin ${user.username} bypassed maintenance`);
+        } else if (isUserWhitelisted(user.id)) {
+          console.log(
+            `✅ Whitelisted user ${user.username} bypassed maintenance`
+          );
+        }
       }
 
       return children;
     },
-    [user, loading, maintenanceLoading, isMaintenanceMode, maintenanceMessage]
+    [
+      user,
+      loading,
+      maintenanceLoading,
+      isMaintenanceMode,
+      maintenanceMessage,
+      isUserWhitelisted,
+    ]
   );
 
   // ========== 7. LAYOUT WRAPPER ==========
@@ -297,7 +397,7 @@ function App() {
         v7_relativeSplatPath: true,
       }}>
       {/* Toast Notification */}
-      {showToast && (
+      {showToast && !isMaintenanceMode && (
         <div className={getToastStyle()}>
           <div className="flex items-center gap-2">
             {toastType === "success" && <span className="text-lg">✅</span>}
@@ -373,6 +473,33 @@ function App() {
             <ProtectedRoute>
               <LayoutWrapper>
                 <Attendance user={user} onShowToast={handleShowToast} />
+              </LayoutWrapper>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ✅ ROUTE BARU: PRESENSI GURU - HANYA UNTUK GURU & ADMIN */}
+        <Route
+          path="/attendance-teacher"
+          element={
+            <ProtectedRoute allowedRoles={["teacher", "guru_bk", "admin"]}>
+              <LayoutWrapper>
+                <TeacherAttendance user={user} onShowToast={handleShowToast} />
+              </LayoutWrapper>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 👇 ROUTE ATTENDANCE-MANAGEMENT HANYA UNTUK ADMIN */}
+        <Route
+          path="/attendance-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <LayoutWrapper>
+                <AttendanceManagement
+                  user={user}
+                  onShowToast={handleShowToast}
+                />
               </LayoutWrapper>
             </ProtectedRoute>
           }

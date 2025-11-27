@@ -128,33 +128,6 @@ export const Login = ({ onLogin, onShowToast }) => {
         throw new Error("Password salah");
       }
 
-      // ✅ BARU: Cek apakah user ini Guru BK
-      let isGuruBK = false;
-
-      if (data.teacher_id && data.role === "teacher") {
-        try {
-          const { data: assignments, error: assignError } = await supabase
-            .from("teacher_assignments")
-            .select("subject")
-            .eq("teacher_id", data.teacher_id);
-
-          if (!assignError && assignments && assignments.length > 0) {
-            // Cek apakah ada subject yang mengandung "BK"
-            isGuruBK = assignments.some(
-              (assignment) =>
-                assignment.subject &&
-                assignment.subject.toUpperCase().includes("BK")
-            );
-
-            console.log("Teacher assignments:", assignments);
-            console.log("Is Guru BK:", isGuruBK);
-          }
-        } catch (assignError) {
-          console.error("Error checking teacher assignments:", assignError);
-          // Tetap lanjut login meski gagal cek assignments
-        }
-      }
-
       const userData = {
         id: data.id,
         username: data.username,
@@ -166,7 +139,6 @@ export const Login = ({ onLogin, onShowToast }) => {
         email: data.email || `${data.username}@smp.edu`,
         is_active: data.is_active,
         created_at: data.created_at,
-        isGuruBK: isGuruBK, // ✅ BARU: Flag untuk identifikasi Guru BK
       };
 
       onLogin(userData, rememberMe);
@@ -432,7 +404,7 @@ export const Login = ({ onLogin, onShowToast }) => {
               {/* Footer */}
               <div className="mt-6 pt-6 border-t border-white/10 text-center">
                 <p className="text-xs text-white/60 mb-1">
-                  © 2025 SMPN 2 CILILIN
+                  © 2025 SMPN 2 Cililin
                 </p>
                 <p className="text-xs text-white/40">
                   Sistem Administrasi Sekolah • v1.0.0

@@ -31,7 +31,9 @@ const Setting = ({ user, onShowToast }) => {
 
   const [loading, setLoading] = useState(false);
   const [schoolConfig, setSchoolConfig] = useState(null);
-  const [showMobileMenu, setShowMobileMenu] = useState(false); // ✅ Mobile menu state
+
+  // ✅ Mobile menu state
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // ✅ Handle URL parameter changes & smooth scroll
   useEffect(() => {
@@ -164,10 +166,8 @@ const Setting = ({ user, onShowToast }) => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-sm sm:text-base text-gray-600">
-            Memuat pengaturan...
-          </p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Memuat pengaturan...</p>
         </div>
       </div>
     );
@@ -220,7 +220,7 @@ const Setting = ({ user, onShowToast }) => {
             </div>
           </div>
 
-          {/* ✅ Mobile Menu Toggle - Only visible on mobile/tablet */}
+          {/* ✅ Mobile Menu Toggle - Only on mobile */}
           {tabs.length > 1 && (
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -234,7 +234,7 @@ const Setting = ({ user, onShowToast }) => {
           )}
         </div>
 
-        {/* ✅ Desktop Tab Navigation - Hidden on mobile/tablet */}
+        {/* ✅ Desktop Tab Navigation - Hidden on mobile */}
         <div className="hidden lg:flex overflow-x-auto border-b border-gray-200 mb-6">
           <div className="flex min-w-max space-x-1">
             {tabs.map((tab) => {
@@ -261,46 +261,39 @@ const Setting = ({ user, onShowToast }) => {
           </div>
         </div>
 
-        {/* ✅ Mobile/Tablet Dropdown Menu */}
+        {/* ✅ Mobile/Tablet Tab Navigation - Dropdown style */}
         {showMobileMenu && (
-          <>
-            <div className="lg:hidden mb-4 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden animate-in slide-in-from-top duration-200 relative z-50">
-              <div className="p-2">
-                {tabs.map((tab) => {
-                  const IconComponent = tab.icon;
-                  const isActive = activeTab === tab.id;
+          <div className="lg:hidden mb-4 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden animate-in slide-in-from-top duration-200">
+            <div className="p-2">
+              {tabs.map((tab) => {
+                const IconComponent = tab.icon;
+                const isActive = activeTab === tab.id;
 
-                  return (
-                    <button
-                      key={tab.id}
-                      className={`w-full flex items-center gap-3 p-3 rounded-lg font-medium text-sm transition-all ${
-                        isActive
-                          ? "text-blue-600 bg-blue-50 border border-blue-200"
-                          : "text-gray-700 hover:bg-gray-50"
-                      }`}
-                      onClick={() => setActiveTab(tab.id)}>
-                      <IconComponent
-                        size={18}
-                        className={isActive ? "text-blue-600" : "text-gray-500"}
-                      />
-                      <span className="flex-1 text-left">{tab.label}</span>
-                      {isActive && (
-                        <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                return (
+                  <button
+                    key={tab.id}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg font-medium text-sm transition-all ${
+                      isActive
+                        ? "text-blue-600 bg-blue-50 border border-blue-200"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setActiveTab(tab.id)}>
+                    <IconComponent
+                      size={18}
+                      className={isActive ? "text-blue-600" : "text-gray-500"}
+                    />
+                    <span className="flex-1 text-left">{tab.label}</span>
+                    {isActive && (
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-
-            {/* Overlay */}
-            <div
-              className="lg:hidden fixed inset-0 bg-black bg-opacity-25 z-40"
-              onClick={() => setShowMobileMenu(false)}></div>
-          </>
+          </div>
         )}
 
-        {/* ✅ Tablet Horizontal Scroll Tabs - Only visible on tablet */}
+        {/* ✅ Tablet Horizontal Scroll Tabs - Only on tablet */}
         <div className="lg:hidden block mb-4 overflow-x-auto scrollbar-hide">
           <div className="flex min-w-max space-x-2 pb-2">
             {tabs.map((tab) => {
@@ -310,7 +303,7 @@ const Setting = ({ user, onShowToast }) => {
               return (
                 <button
                   key={tab.id}
-                  className={`flex items-center gap-2 whitespace-nowrap py-2.5 px-3 sm:px-4 rounded-lg font-medium text-xs sm:text-sm transition-all ${
+                  className={`flex items-center gap-2 whitespace-nowrap py-2.5 px-4 rounded-lg font-medium text-xs sm:text-sm transition-all ${
                     isActive
                       ? "text-blue-600 bg-blue-50 border-2 border-blue-600 shadow-sm"
                       : "text-gray-600 bg-white border border-gray-200 hover:bg-gray-50"
@@ -327,13 +320,20 @@ const Setting = ({ user, onShowToast }) => {
           </div>
         </div>
 
-        {/* ✅ Tab Content - Responsive with smooth scroll ID */}
+        {/* ✅ Tab Content - Responsive padding */}
         <div
           id={`${activeTab}-tab-content`}
           className="bg-white rounded-lg shadow-sm transition-all duration-300 overflow-hidden">
           {renderActiveTab()}
         </div>
       </div>
+
+      {/* ✅ Overlay for mobile menu */}
+      {showMobileMenu && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-25 z-40"
+          onClick={() => setShowMobileMenu(false)}></div>
+      )}
     </div>
   );
 };
