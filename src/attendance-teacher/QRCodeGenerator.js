@@ -3,8 +3,14 @@ import React, { useState, useRef, useEffect } from "react";
 import { Download, RefreshCw } from "lucide-react";
 
 const QRCodeGenerator = () => {
-  // ✅ KODE QR UNTUK SMPN 2 CILILIN (sesuai dengan yang di scanner)
-  const qrCode = "QR_PRESENSI_GURU_SMPN_2_Cililin_CILILIN";
+  // ✅ KODE QR format JSON
+  const qrData = {
+    type: "PRESENSI_GURU",
+    school: "SMPN_2_CILILIN",
+    code: "QR_PRESENSI_GURU_SMPN_2_CILILIN",
+  };
+  const qrCode = JSON.stringify(qrData); // ✅ INI YANG BARU
+
   const [qrUrl, setQrUrl] = useState("");
   const [finalQrUrl, setFinalQrUrl] = useState("");
   const canvasRef = useRef(null);

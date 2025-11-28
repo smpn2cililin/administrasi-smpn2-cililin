@@ -1,4 +1,4 @@
-// src/attendance-teacher/QRScanner.js - FIXED CAMERA FLICKERING
+// src/attendance-teacher/QRScanner.js - UPDATED FOR JSON QR CODE
 import React, { useState, useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import {
@@ -20,23 +20,19 @@ const QRScanner = ({ currentUser, onSuccess }) => {
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
   const [teachersList, setTeachersList] = useState([]);
 
-  // ✅ USE REF INSTEAD OF STATE - mencegah re-render
   const html5QrCodeRef = useRef(null);
   const isScanningRef = useRef(false);
 
-  // Check if user is admin
   useEffect(() => {
     checkAdminStatus();
   }, [currentUser]);
 
-  // Load teachers list for admin
   useEffect(() => {
     if (isAdmin) {
       loadTeachers();
     }
   }, [isAdmin]);
 
-  // ✅ CAMERA CONTROL - FIXED dengan useRef
   useEffect(() => {
     let mounted = true;
 
@@ -87,9 +83,7 @@ const QRScanner = ({ currentUser, onSuccess }) => {
     }
   };
 
-  // ✅ FUNGSI KAMERA - FIXED FLICKERING
   const startCamera = async () => {
-    // Cegah double start
     if (isScanningRef.current) {
       console.log("⚠️ Camera already running, skipping start");
       return;
@@ -143,39 +137,53 @@ const QRScanner = ({ currentUser, onSuccess }) => {
     // Silent - normal scanning errors
   };
 
+  // ✅ UPDATED: VALIDASI QR CODE FORMAT JSON
   const onScanSuccess = async (decodedText) => {
     console.log("📷 QR Detected:", decodedText);
 
-    // Validasi QR Code
-    const validQRCodes = [
-      "QR_PRESENSI_GURU_SMP_MUSLIMIN_CILILIN",
-      "QR_PRESENSI_GURU_2024",
-    ];
+    try {
+      // ✅ Parse JSON dari QR Code
+      const qrData = JSON.parse(decodedText);
 
-    if (!validQRCodes.includes(decodedText)) {
-      console.log("❌ Invalid QR Code");
+      console.log("📦 QR Data:", qrData);
+
+      // ✅ Validasi format QR Code
+      if (
+        qrData.type !== "PRESENSI_GURU" ||
+        qrData.school !== "SMPN_2_CILILIN" ||
+        qrData.code !== "QR_PRESENSI_GURU_SMPN_2_CILILIN"
+      ) {
+        console.log("❌ Invalid QR Code format");
+        setMessage({
+          type: "error",
+          text: "❌ QR Code tidak valid untuk SMPN 2 CILILIN!",
+        });
+        return;
+      }
+
+      console.log("✅ Valid QR Code");
+
+      // Stop camera dulu sebelum proses lebih lanjut
+      await stopCamera();
+      setScanning(false);
+
+      // Jika Admin, tanya dulu mau input untuk siapa
+      if (isAdmin) {
+        console.log("👤 Admin detected, showing teacher selection...");
+        setShowTeacherSelect(true);
+        return;
+      }
+
+      // Jika bukan admin, langsung proses
+      await processAttendance();
+    } catch (error) {
+      // ❌ Jika bukan JSON atau format salah
+      console.error("❌ QR Parse Error:", error);
       setMessage({
         type: "error",
-        text: "QR Code tidak valid! Gunakan QR Code resmi presensi guru.",
+        text: "❌ Format QR Code tidak valid! Gunakan QR Code resmi presensi guru.",
       });
-      return;
     }
-
-    console.log("✅ Valid QR Code");
-
-    // Stop camera dulu sebelum proses lebih lanjut
-    await stopCamera();
-    setScanning(false);
-
-    // Jika Admin, tanya dulu mau input untuk siapa
-    if (isAdmin) {
-      console.log("👤 Admin detected, showing teacher selection...");
-      setShowTeacherSelect(true);
-      return;
-    }
-
-    // Jika bukan admin, langsung proses
-    await processAttendance();
   };
 
   const processAttendance = async (adminSelectedTeacherId = null) => {
