@@ -1,5 +1,5 @@
-// src/attendance-teacher/QRScanner.js - CAMERA + ADMIN MODE
-import React, { useState, useEffect } from "react";
+// src/attendance-teacher/QRScanner.js - FIXED CAMERA FLICKERING
+import React, { useState, useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import {
   CheckCircle,
@@ -15,11 +15,14 @@ const QRScanner = ({ currentUser, onSuccess }) => {
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [html5QrCode, setHtml5QrCode] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showTeacherSelect, setShowTeacherSelect] = useState(false);
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
   const [teachersList, setTeachersList] = useState([]);
+
+  // ✅ USE REF INSTEAD OF STATE - mencegah re-render
+  const html5QrCodeRef = useRef(null);
+  const isScanningRef = useRef(false);
 
   // Check if user is admin
   useEffect(() => {
@@ -33,14 +36,22 @@ const QRScanner = ({ currentUser, onSuccess }) => {
     }
   }, [isAdmin]);
 
+  // ✅ CAMERA CONTROL - FIXED dengan useRef
   useEffect(() => {
-    if (scanning) {
-      startCamera();
-    } else {
-      stopCamera();
-    }
+    let mounted = true;
+
+    const initCamera = async () => {
+      if (scanning && !isScanningRef.current && mounted) {
+        await startCamera();
+      } else if (!scanning && isScanningRef.current) {
+        await stopCamera();
+      }
+    };
+
+    initCamera();
 
     return () => {
+      mounted = false;
       stopCamera();
     };
   }, [scanning]);
@@ -76,12 +87,19 @@ const QRScanner = ({ currentUser, onSuccess }) => {
     }
   };
 
+  // ✅ FUNGSI KAMERA - FIXED FLICKERING
   const startCamera = async () => {
+    // Cegah double start
+    if (isScanningRef.current) {
+      console.log("⚠️ Camera already running, skipping start");
+      return;
+    }
+
     try {
       console.log("🎥 Starting camera...");
 
       const qrCode = new Html5Qrcode("qr-reader");
-      setHtml5QrCode(qrCode);
+      html5QrCodeRef.current = qrCode;
 
       await qrCode.start(
         { facingMode: "environment" },
@@ -93,6 +111,7 @@ const QRScanner = ({ currentUser, onSuccess }) => {
         onScanError
       );
 
+      isScanningRef.current = true;
       console.log("✅ Camera started!");
     } catch (err) {
       console.error("❌ Camera error:", err);
@@ -101,19 +120,27 @@ const QRScanner = ({ currentUser, onSuccess }) => {
         text: "Gagal membuka kamera: " + err.message,
       });
       setScanning(false);
+      isScanningRef.current = false;
     }
   };
 
   const stopCamera = async () => {
-    if (html5QrCode && html5QrCode.isScanning) {
+    if (html5QrCodeRef.current && isScanningRef.current) {
       try {
         console.log("🛑 Stopping camera...");
-        await html5QrCode.stop();
+        await html5QrCodeRef.current.stop();
+        html5QrCodeRef.current = null;
+        isScanningRef.current = false;
         console.log("✅ Camera stopped");
       } catch (err) {
         console.error("❌ Error stopping camera:", err);
+        isScanningRef.current = false;
       }
     }
+  };
+
+  const onScanError = (error) => {
+    // Silent - normal scanning errors
   };
 
   const onScanSuccess = async (decodedText) => {
@@ -121,7 +148,7 @@ const QRScanner = ({ currentUser, onSuccess }) => {
 
     // Validasi QR Code
     const validQRCodes = [
-      "QR_PRESENSI_GURU_SMPN_2_Cililin_CILILIN",
+      "QR_PRESENSI_GURU_SMP_MUSLIMIN_CILILIN",
       "QR_PRESENSI_GURU_2024",
     ];
 
@@ -136,10 +163,13 @@ const QRScanner = ({ currentUser, onSuccess }) => {
 
     console.log("✅ Valid QR Code");
 
+    // Stop camera dulu sebelum proses lebih lanjut
+    await stopCamera();
+    setScanning(false);
+
     // Jika Admin, tanya dulu mau input untuk siapa
     if (isAdmin) {
       console.log("👤 Admin detected, showing teacher selection...");
-      setScanning(false);
       setShowTeacherSelect(true);
       return;
     }
@@ -177,19 +207,16 @@ const QRScanner = ({ currentUser, onSuccess }) => {
       // ✅ VALIDASI JAM OPERASIONAL: 07:00 - 14:00 (HANYA UNTUK GURU BIASA)
       if (!isAdmin) {
         const currentTimeInMinutes = hour * 60 + minute;
-        const startTime = 7 * 60; // 07:00 = 420 menit
-        const endTime = 14 * 60; // 14:00 = 840 menit
+        const startTime = 7 * 60;
+        const endTime = 14 * 60;
 
         if (
           currentTimeInMinutes < startTime ||
           currentTimeInMinutes > endTime
         ) {
-          const startTimeStr = "07:00";
-          const endTimeStr = "14:00";
-
           setMessage({
             type: "error",
-            text: `⏰ Presensi hanya dapat dilakukan pada jam ${startTimeStr} - ${endTimeStr} WIB. Waktu saat ini: ${hourStr}:${minuteStr} WIB`,
+            text: `⏰ Presensi hanya dapat dilakukan pada jam 07:00 - 14:00 WIB. Waktu saat ini: ${hourStr}:${minuteStr} WIB`,
           });
           setLoading(false);
           return;
@@ -215,12 +242,7 @@ const QRScanner = ({ currentUser, onSuccess }) => {
           .eq("id", currentUser.id)
           .single();
 
-        if (userError) {
-          console.error("❌ User error:", userError);
-          throw userError;
-        }
-
-        console.log("👨‍🏫 Teacher data:", userData);
+        if (userError) throw userError;
 
         if (!userData.teacher_id) {
           throw new Error("Teacher ID tidak ditemukan di data guru");
@@ -240,11 +262,8 @@ const QRScanner = ({ currentUser, onSuccess }) => {
         .maybeSingle();
 
       if (checkError && checkError.code !== "PGRST116") {
-        console.error("❌ Check error:", checkError);
         throw checkError;
       }
-
-      console.log("📋 Existing attendance:", existingAttendance);
 
       if (existingAttendance) {
         setMessage({
@@ -295,12 +314,7 @@ const QRScanner = ({ currentUser, onSuccess }) => {
         .from("teacher_attendance")
         .insert(attendanceData);
 
-      if (insertError) {
-        console.error("❌ Insert error:", insertError);
-        throw insertError;
-      }
-
-      console.log("✅ Attendance saved successfully!");
+      if (insertError) throw insertError;
 
       setMessage({
         type: "success",
@@ -318,11 +332,13 @@ const QRScanner = ({ currentUser, onSuccess }) => {
       // Reset selection
       setSelectedTeacherId(null);
 
-      // Trigger refresh di parent
-      if (onSuccess) {
-        console.log("🔄 Triggering parent refresh...");
-        onSuccess();
-      }
+      // Auto-hide success message
+      setTimeout(() => {
+        setMessage(null);
+      }, 3000);
+
+      // Trigger refresh
+      if (onSuccess) onSuccess();
     } catch (error) {
       console.error("❌ Error submitting attendance:", error);
       setMessage({
@@ -334,18 +350,12 @@ const QRScanner = ({ currentUser, onSuccess }) => {
     }
   };
 
-  const onScanError = (error) => {
-    // Silent - normal scanning errors
-  };
-
   const startScanning = () => {
-    console.log("🚀 Start scanning button clicked");
     setMessage(null);
     setScanning(true);
   };
 
   const stopScanning = () => {
-    console.log("🛑 Stop scanning button clicked");
     setScanning(false);
     setMessage(null);
   };
