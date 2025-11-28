@@ -32,10 +32,7 @@ const Sidebar = ({
           </div>
           <div>
             <div className="text-lg font-bold text-white leading-tight">
-              SMPN 2 Cililin
-            </div>
-            <div className="text-lg font-bold text-white leading-tight mt-1">
-              Cililin
+              SMPN 2 CILILIN
             </div>
           </div>
         </div>
@@ -252,8 +249,9 @@ const Sidebar = ({
           )}
 
           {/* Management Presensi - HANYA UNTUK ADMIN */}
+          {/* DINONAKTIFKAN SEMENTARA - BELUM BERES
           {isAdmin && (
-            <a
+            
               href="#attendance-management"
               className={`
                 flex items-center gap-3 px-6 py-2.5 text-white font-medium transition-all duration-200 cursor-pointer hover:bg-blue-800 hover:pl-8 rounded-r-full mr-4
@@ -288,6 +286,7 @@ const Sidebar = ({
               <span className="flex-1 text-sm">Management Presensi</span>
             </a>
           )}
+          */}
 
           {/* Nilai - Untuk Admin dan non-Guru BK */}
           {(isAdmin || !isGuruBK) && (

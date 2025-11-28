@@ -129,7 +129,7 @@ const Layout = ({ user, onLogout, children }) => {
     if (path === "/students") return "students";
     if (path === "/classes") return "classes";
     if (path === "/attendance") return "attendance";
-    if (path === "/attendance-management") return "attendance-management";
+    //if (path === "/attendance-management") return "attendance-management";
     if (path === "/attendance-teacher") return "attendance-teacher";
     if (path === "/grades") return "grades";
     if (path === "/jadwal-saya") return "jadwal-saya";
