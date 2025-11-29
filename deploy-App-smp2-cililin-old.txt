@@ -1,0 +1,28 @@
+@echo off
+echo ==========================================
+echo   DEPLOY ADMINISTRASI SMPN2 CILILIN
+echo ==========================================
+echo.
+
+cd "D:\Aplikasi Develop\ADMINISTRASI  SMPN2 CILILIN"
+
+echo [1/4] Adding files to git...
+git add .
+
+echo.
+echo [2/4] Committing changes...
+git commit -m "update terbaru"
+
+echo.
+echo [3/4] Pushing to GitHub...
+git push origin main
+
+echo.
+echo [4/4] Deploying to Vercel...
+vercel --prod
+
+echo.
+echo ==========================================
+echo   DEPLOYMENT COMPLETE!
+echo ==========================================
+pause
