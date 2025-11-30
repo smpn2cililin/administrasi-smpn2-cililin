@@ -129,7 +129,7 @@ const Layout = ({ user, onLogout, children }) => {
     if (path === "/students") return "students";
     if (path === "/classes") return "classes";
     if (path === "/attendance") return "attendance";
-    //if (path === "/attendance-management") return "attendance-management";
+    if (path === "/attendance-management") return "attendance-management";
     if (path === "/attendance-teacher") return "attendance-teacher";
     if (path === "/grades") return "grades";
     if (path === "/jadwal-saya") return "jadwal-saya";
@@ -380,6 +380,10 @@ const Layout = ({ user, onLogout, children }) => {
           isOpen={isSidebarOpen}
           userRole={user?.role}
           isWaliKelas={!!user?.homeroom_class_id}
+          userData={{
+            full_name: user?.full_name || user?.username || "User",
+            homeroom_class_name: user?.homeroom_class_id || "",
+          }}
         />
       </div>
 
@@ -393,6 +397,10 @@ const Layout = ({ user, onLogout, children }) => {
           isOpen={true}
           userRole={user?.role}
           isWaliKelas={!!user?.homeroom_class_id}
+          userData={{
+            full_name: user?.full_name || user?.username || "User",
+            homeroom_class_name: user?.homeroom_class_id || "",
+          }}
           onClose={() => setMobileMenuOpen(false)}
         />
       </div>

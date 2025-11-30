@@ -3,14 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Download, RefreshCw } from "lucide-react";
 
 const QRCodeGenerator = () => {
-  // ✅ KODE QR format JSON
-  const qrData = {
-    type: "PRESENSI_GURU",
-    school: "SMPN_2_CILILIN",
-    code: "QR_PRESENSI_GURU_SMPN_2_CILILIN",
-  };
-  const qrCode = JSON.stringify(qrData); // ✅ INI YANG BARU
-
+  const qrCode = "QR_PRESENSI_GURU_SMPN_2_Cililin_CILILIN";
   const [qrUrl, setQrUrl] = useState("");
   const [finalQrUrl, setFinalQrUrl] = useState("");
   const canvasRef = useRef(null);
@@ -90,7 +83,7 @@ const QRCodeGenerator = () => {
         ctx.font = `bold ${fontSize}px Arial`;
 
         const textY = logoY + logoSize + 8;
-        ctx.fillText("SMPN 2 CILILIN", width / 2, textY);
+        ctx.fillText("SMPN 2 Cililin", width / 2, textY);
 
         // Convert canvas to data URL
         setFinalQrUrl(canvas.toDataURL("image/png"));
@@ -107,7 +100,7 @@ const QRCodeGenerator = () => {
         ctx.font = `bold ${fontSize}px Arial`;
 
         const textY = lineY + 40;
-        ctx.fillText("SMPN 2 CILILIN", width / 2, textY);
+        ctx.fillText("SMPN 2 Cililin", width / 2, textY);
 
         setFinalQrUrl(canvas.toDataURL("image/png"));
       };
@@ -132,7 +125,7 @@ const QRCodeGenerator = () => {
           🎯 Generator QR Presensi Guru
         </h1>
         <p className="text-gray-600">
-          Generate QR Code untuk sistem presensi guru SMPN 2 CILILIN
+          Generate QR Code untuk sistem presensi guru SMPN 2 Cililin
         </p>
       </div>
 
@@ -157,7 +150,7 @@ const QRCodeGenerator = () => {
               className="w-full max-w-md mx-auto"
             />
             <p className="text-center text-sm text-gray-600 mt-2">
-              QR CODE SMPN 2 CILILIN
+              QR CODE SMPN 2 Cililin
             </p>
           </div>
 
